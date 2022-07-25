@@ -8,6 +8,7 @@ from __future__ import print_function
 import numpy as np
 import cv2
 import os, math
+from pyntcloud import PyntCloud
 from scipy.optimize import leastsq
 from PIL import Image
 
@@ -409,8 +410,11 @@ def load_depth(img_filename):
 
 
 def load_velo_scan(velo_filename, dtype=np.float32, n_vec=4):
-    scan = np.fromfile(velo_filename, dtype=dtype)
-    scan = scan.reshape((-1, n_vec))
+    if velo_filename.endswith('.bin'):
+        scan = np.fromfile(velo_filename, dtype=dtype)
+        scan = scan.reshape((-1, n_vec))
+    elif velo_filename.endswith('.pcd'):
+        scan = PyntCloud.from_file(str(velo_filename)).points.values[:, :n_vec].astype(np.float32)
     return scan
 
 

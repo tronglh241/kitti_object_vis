@@ -9,7 +9,7 @@ import os
 import sys
 import numpy as np
 import cv2
-
+from pathlib import Path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, "mayavi"))
@@ -39,8 +39,9 @@ class kitti_object(object):
         elif split == "testing":
             self.num_samples = 7518
         else:
-            print("Unknown split: %s" % (split))
-            exit(-1)
+            self.num_samples = 1000
+        #     print("Unknown split: %s" % (split))
+        #     exit(-1)
 
         lidar_dir = "velodyne"
         depth_dir = "depth"
@@ -50,9 +51,9 @@ class kitti_object(object):
             depth_dir = args.depthdir
             pred_dir = args.preddir
 
-        self.image_dir = os.path.join(self.split_dir, "image_2")
-        self.label_dir = os.path.join(self.split_dir, "label_2")
-        self.calib_dir = os.path.join(self.split_dir, "calib")
+        self.image_dir = os.path.join(self.split_dir, f"image_{args.view}")
+        self.label_dir = os.path.join(self.split_dir, f"label_{args.view}")
+        self.calib_dir = os.path.join(self.split_dir, f"calib_{args.view}")
 
         self.depthpc_dir = os.path.join(self.split_dir, "depth_pc")
         self.lidar_dir = os.path.join(self.split_dir, lidar_dir)
@@ -64,12 +65,12 @@ class kitti_object(object):
 
     def get_image(self, idx):
         assert idx < self.num_samples
-        img_filename = os.path.join(self.image_dir, "%06d.png" % (idx))
+        img_filename = str(list(Path(self.image_dir).glob(f'{idx:06d}.*'))[0])
         return utils.load_image(img_filename)
 
     def get_lidar(self, idx, dtype=np.float32, n_vec=4):
         assert idx < self.num_samples
-        lidar_filename = os.path.join(self.lidar_dir, "%06d.bin" % (idx))
+        lidar_filename = str(list(Path(self.lidar_dir).glob(f'{idx:06d}.*'))[0])
         print(lidar_filename)
         return utils.load_velo_scan(lidar_filename, dtype, n_vec)
 
@@ -104,7 +105,7 @@ class kitti_object(object):
 
     def get_depth_pc(self, idx):
         assert idx < self.num_samples
-        lidar_filename = os.path.join(self.depthpc_dir, "%06d.bin" % (idx))
+        lidar_filename = str(list(Path(self.lidar_dir).glob(f'{idx:06d}.*'))[0])
         is_exist = os.path.exists(lidar_filename)
         if is_exist:
             return utils.load_velo_scan(lidar_filename), is_exist
@@ -225,7 +226,8 @@ def show_image_with_boxes(img, objects, calib, show3d=True, depth=None):
             img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 0))
         elif obj.type == "Cyclist":
             img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 255, 255))
-
+        else:
+            img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 255))
 
         # project
         # box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
@@ -242,7 +244,7 @@ def show_image_with_boxes(img, objects, calib, show3d=True, depth=None):
         cv2.imshow("3dbox", img2)
     if depth is not None:
         cv2.imshow("depth", depth)
-    
+
     return img1, img2
 
 
@@ -437,7 +439,8 @@ def show_lidar_with_depth(
             draw_gt_boxes3d([box3d_pts_3d_velo], fig=fig, color=(0,1,1), label=obj.type)
         elif obj.type == "Cyclist":
             draw_gt_boxes3d([box3d_pts_3d_velo], fig=fig, color=(1,1,0), label=obj.type)
-
+        else:
+            draw_gt_boxes3d([box3d_pts_3d_velo], fig=fig, color=(1,1,1), label=obj.type)
 
     if objects_pred is not None:
         color = (1, 0, 0)
@@ -734,7 +737,7 @@ def show_lidar_topview_with_boxes(pc_velo, objects, calib, objects_pred=None):
 
 
 def dataset_viz(root_dir, args):
-    dataset = kitti_object(root_dir, split=args.split, args=args)
+    dataset = kitti_object(root_dir, split=args.split, args=args,)
     ## load 2d detection results
     #objects2ds = read_det_file("box2d.list")
 
@@ -974,6 +977,7 @@ if __name__ == "__main__":
         action="store_true",
         help="show lidar topview",
     )
+    parser.add_argument('--view')
     args = parser.parse_args()
     if args.pred:
         assert os.path.exists(args.dir + "/" + args.split + "/pred")
